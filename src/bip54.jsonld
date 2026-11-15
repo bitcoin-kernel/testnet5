@@ -1,0 +1,82 @@
+{
+  "@context": { "btc": "https://bitcoin-kernel.com/ns/btc#", "bip54": "https://bitcoin-kernel.com/ns/bip54#" },
+  "@graph": [
+    {
+      "@id": "btc:testnet5",
+      "@type": "btc:NetworkParams",
+      "label": "testnet5",
+      "name": "testnet5",
+      "comment": "Testnet5 (BIP95): mainnet rules, minimum difficulty 0x1a0fffff with no 20-minute exception, BIP54 from block 1. Values from Bitcoin Core PR 35861 (CTestNet5Params).",
+      "magic": "46495645",
+      "genesisHash": "00000000000008c1637e7d3252dc1c333d4546fd6fff6a474b200d674a91d497",
+      "powLimit": "0000000000000fffff0000000000000000000000000000000000000000000000",
+      "targetTimespan": 1209600,
+      "targetSpacing": 600,
+      "difficultyAdjustmentInterval": 2016,
+      "maxFutureBlockTime": 7200,
+      "halvingInterval": 210000,
+      "port": 18353,
+      "p2pkhVersion": 111,
+      "p2shVersion": 196,
+      "bech32Hrp": "tb",
+      "maxMoney": 2100000000000000,
+      "initialSubsidy": 5000000000,
+      "maxBlockWeight": 4000000,
+      "bip34Height": 1,
+      "bip65Height": 1,
+      "bip66Height": 1,
+      "csvHeight": 1,
+      "segwitHeight": 1,
+      "taprootHeight": 1,
+      "maxBlockSigopsCost": 80000,
+      "coinbaseMaturity": 100,
+      "allowMinDifficultyBlocks": false,
+      "timewarpFix": true,
+      "maxTimewarp": 7200,
+      "retargetSeed": "last",
+      "xpubVersion": 70617039,
+      "bip54Height": 1,
+      "bip54MaxTxSigops": 2500
+    },
+    {
+      "@id": "bip54:rule-header-period-order",
+      "@type": "ValidationRule",
+      "ruleSet": "btc:HeaderRules",
+      "label": "period-order",
+      "errorCode": "time-negative-interval",
+      "comment": "BIP54 (the Murch-Zawy fix): the last block of a difficulty period may not have a timestamp earlier than the period's first block.",
+      "check": "height % 2016 != 2015 || header.time >= chainAt(height - 2015).time",
+      "activationParam": "bip54Height"
+    },
+    {
+      "@id": "bip54:rule-block-no-64-byte-tx",
+      "@type": "ValidationRule",
+      "ruleSet": "btc:BlockRules",
+      "label": "no-64-byte-tx",
+      "errorCode": "bad-txns-size",
+      "comment": "BIP54: no transaction in a block may be exactly 64 bytes when serialized without witness, so a transaction can never be mistaken for an inner Merkle node.",
+      "check": "every tx: size(tx without witness) != 64",
+      "activationParam": "bip54Height"
+    },
+    {
+      "@id": "bip54:rule-blockctx-coinbase-locktime",
+      "@type": "ValidationRule",
+      "ruleSet": "btc:BlockContextRules",
+      "label": "coinbase-locktime",
+      "errorCode": "bad-cb-locktime",
+      "comment": "BIP54: the coinbase's nLockTime is the block height minus one, and its input's nSequence is not final (0xffffffff), so the locktime is enforced. Together with BIP34 this makes coinbase transactions unique without BIP30.",
+      "check": "coinbase.locktime == height - 1 && coinbase.inputs[0].sequence != 0xffffffff",
+      "activationParam": "bip54Height"
+    },
+    {
+      "@id": "bip54:rule-blockctx-tx-sigops",
+      "@type": "ValidationRule",
+      "ruleSet": "btc:BlockContextRules",
+      "label": "tx-legacy-sigops",
+      "errorCode": "bad-txns-legacy-sigops",
+      "comment": "BIP54: a transaction's potentially executed legacy sigops (its scriptSigs, plus the spent scriptPubKeys, plus P2SH redeem scripts, counted accurately as BIP16 does) may not exceed 2500.",
+      "check": "every non-coinbase tx: sum over inputs of sigops(scriptSig) + sigops(prevout.scriptPubKey, scriptSig) <= bip54MaxTxSigops",
+      "activationParam": "bip54Height"
+    }
+  ]
+}
