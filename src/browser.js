@@ -1,16 +1,20 @@
-// The testnet5 node in a browser tab. Blocks arrive over HTTPS from libbitcoin servers (raw bytes,
-// identical to Core's); the tab validates every one with the bitcoin-kernel engine and BIP54, so a
-// server is only transport: a bad block fails here like anywhere. Blocks are kept in IndexedDB, so a
-// reload re-validates from local copies and fetches only what is new.
+// The testnet5 node in a browser tab. Blocks come in bulk, as sealed epoch files (one per completed
+// difficulty period) served next to this page; the tab validates every block with the bitcoin-kernel
+// engine and BIP54, so the files are transport, not trust. Validated blocks are kept in IndexedDB,
+// so a reload re-validates the local copy and downloads nothing.
+//
+// Other people's servers are asked at most once per page load, and only for the tip height
+// (to show how far the epoch files are behind). Blocks are never fetched one by one.
 const ENGINE = 'https://cdn.jsdelivr.net/gh/bitcoin-desktop/schema@v0.0.27';
 const { createKernel } = await import(`${ENGINE}/codec/kernel.js`);
 const { bip54 } = await import('./bip54.js');
 const { Chain } = await import('./chain.js');
 
-export const SOURCES = ['https://wormer.libbitcoin.net:58143/v1', 'https://carmine.libbitcoin.net:58143/v1'];
-const CONCURRENCY = 6;
+export const TIP_SOURCE = 'https://wormer.libbitcoin.net:58143/v1/top';
+const EPOCHS = new URL('../epochs/', import.meta.url);
 
 const json = async (url) => { const r = await fetch(url); if (!r.ok) throw new Error(`${url}: ${r.status}`); return r.json(); };
+const hex = (bytes) => Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 
 export async function loadKernel() {
   const s = (p) => json(`${ENGINE}/${p}`);
@@ -29,9 +33,9 @@ function openDb() {
     req.onerror = () => reject(req.error);
   });
 }
-const tx = (db, mode, fn) => new Promise((resolve, reject) => {
-  const t = db.transaction('blocks', mode); const out = fn(t.objectStore('blocks'));
-  t.oncomplete = () => resolve(out?.result ?? out); t.onerror = () => reject(t.error);
+const store = (db, mode, fn) => new Promise((resolve, reject) => {
+  const t = db.transaction('blocks', mode); fn(t.objectStore('blocks'));
+  t.oncomplete = () => resolve(); t.onerror = () => reject(t.error);
 });
 const allCached = (db) => new Promise((resolve, reject) => {
   const out = []; const req = db.transaction('blocks').objectStore('blocks').openCursor();
@@ -39,14 +43,29 @@ const allCached = (db) => new Promise((resolve, reject) => {
   req.onerror = () => reject(req.error);
 });
 
+// an epoch file: u32le length + raw block, repeated
+function splitEpoch(buf) {
+  const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength), out = [];
+  for (let at = 0; at < buf.length;) { const n = view.getUint32(at, true); out.push(hex(buf.subarray(at + 4, at + 4 + n))); at += 4 + n; }
+  return out;
+}
+
 export class BrowserNode {
-  constructor({ onUpdate = () => {}, log = () => {} } = {}) { Object.assign(this, { onUpdate, log }); this.stats = { fetched: 0, cached: 0, validateMs: 0 }; }
+  constructor({ onUpdate = () => {}, log = () => {} } = {}) {
+    Object.assign(this, { onUpdate, log });
+    this.stats = { cached: 0, fromEpochs: 0, epochBytes: 0, validateMs: 0 };
+    this.networkTip = null;
+  }
 
   async start() {
     this.k = await loadKernel();
     this.chain = new Chain(this.k);
     try { this.db = await openDb(); } catch { this.db = null; } // private windows: no cache, still works
-    // 1. local copies first, each validated again
+    this.busy = true;
+    // the one outside request: the tip height, to say how far behind we are
+    fetch(TIP_SOURCE, { headers: { accept: 'application/json' } }).then((r) => r.json())
+      .then((t) => { this.networkTip = Number(t); this.onUpdate(this); }).catch(() => {});
+    // 1. the local copy, each block validated again
     const cached = this.db ? await allCached(this.db) : [];
     let h = 0;
     for (; h < cached.length && cached[h]; h++) {
@@ -54,61 +73,37 @@ export class BrowserNode {
       this.stats.cached++;
       if (h % 250 === 0) { this.onUpdate(this); await new Promise((r) => setTimeout(r)); }
     }
-    if (this.db && h < cached.length) await tx(this.db, 'readwrite', (s) => s.delete(IDBKeyRange.lowerBound(h)));
-    // 2. the rest from a source, then follow
-    await this.sync();
-    this.timer = setInterval(() => this.sync().catch((e) => this.log(e.message)), 30000);
+    if (this.db && h < cached.length) await store(this.db, 'readwrite', (s) => s.delete(IDBKeyRange.lowerBound(h)));
+    // 2. the sealed epochs we do not have yet, one file each
+    const index = await json(new URL('index.json', EPOCHS));
+    for (const e of index.epochs) {
+      if (this.chain.height >= e.to) continue;
+      this.log(`epoch ${e.epoch}: blocks ${e.from}..${e.to}, ${(e.bytes / 1e6).toFixed(2)} MB`);
+      const buf = new Uint8Array(await (await fetch(new URL(e.file, EPOCHS))).arrayBuffer());
+      const digest = hex(new Uint8Array(await crypto.subtle.digest('SHA-256', buf)));
+      if (digest !== e.sha256) throw new Error(`${e.file}: sha256 ${digest.slice(0, 12)}… is not the index's (torn download?)`);
+      this.stats.epochBytes += buf.length;
+      const blocks = splitEpoch(buf);
+      const batch = [];
+      for (let i = this.chain.height + 1 - e.from; i < blocks.length; i++) {
+        const height = e.from + i;
+        this.#connect(blocks[i], height);
+        this.stats.fromEpochs++;
+        batch.push([height, blocks[i]]);
+        if (i % 250 === 0) { this.onUpdate(this); await new Promise((r) => setTimeout(r)); }
+      }
+      if (this.chain.tip !== e.lastHash) throw new Error(`epoch ${e.epoch} ends at ${this.chain.tip}, the index says ${e.lastHash}`);
+      if (this.db) await store(this.db, 'readwrite', (s) => { for (const [height, b] of batch) s.put(b, height); });
+    }
+    this.busy = false;
+    this.onUpdate(this);
   }
 
-  #connect(hex, height) {
+  #connect(blockHex, height) {
     const t0 = performance.now();
-    const block = this.k.codec.decode('Block', hex);
+    const block = this.k.codec.decode('Block', blockHex);
     if (height === 0) this.chain.setGenesis(block); else this.chain.connect(block);
     this.stats.validateMs += performance.now() - t0;
-  }
-
-  async #fetchBlock(source, height) {
-    const r = await fetch(`${source}/block/height/${height}`, { headers: { accept: 'text/plain' } });
-    if (!r.ok) throw new Error(`block ${height}: ${r.status}`);
-    return (await r.text()).trim();
-  }
-
-  async sync() {
-    if (this.busy) return; this.busy = true;
-    try {
-      for (const source of SOURCES) {
-        try { await this.#syncFrom(source); this.source = source; break; }
-        catch (e) { this.log(`${new URL(source).host}: ${e.message}`); }
-      }
-    } finally { this.busy = false; this.onUpdate(this); }
-  }
-
-  async #syncFrom(source) {
-    const top = Number(await (await fetch(`${source}/top`, { headers: { accept: 'application/json' } })).json());
-    let reorgs = 0;
-    while (this.chain.height < top) {
-      const from = this.chain.height + 1, to = Math.min(top, from + 99);
-      const hexes = new Array(to - from + 1);
-      let next = from;
-      await Promise.all(Array.from({ length: CONCURRENCY }, async () => {
-        while (next <= to) { const h = next++; hexes[h - from] = await this.#fetchBlock(source, h); this.stats.fetched++; }
-      }));
-      for (let i = 0; i < hexes.length; i++) {
-        const height = from + i;
-        try { this.#connect(hexes[i], height); }
-        catch (e) {
-          // a block that does not build on our tip: the source is on another branch, or ours was reorged away
-          if (!/prev-link|bad-prevblk|prev/.test(e.message) || reorgs++ > 3) throw e;
-          const back = Math.max(0, this.chain.height - 6);
-          this.log(`reorg: rolling back to ${back}`);
-          this.chain.truncate(back);
-          if (this.db) await tx(this.db, 'readwrite', (s) => s.delete(IDBKeyRange.lowerBound(back + 1)));
-          break;
-        }
-        if (this.db) await tx(this.db, 'readwrite', (s) => s.put(hexes[i], height));
-      }
-      this.onUpdate(this);
-    }
   }
 
   balance(address) {

@@ -1,0 +1,25 @@
+{
+  "network": "testnet5",
+  "interval": 2016,
+  "format": "u32le length + raw block, repeated",
+  "epochs": [
+    {
+      "epoch": 0,
+      "file": "epoch-0.bin",
+      "from": 0,
+      "to": 2015,
+      "lastHash": "00000000000005912750c25d2d60f320d3863e3a73332a7fbc990f8cc6194c93",
+      "bytes": 1178527,
+      "sha256": "83c52293f0f19b3dad28a938d8d27227dbedad2d0194d1d6016872137f4a52b2"
+    },
+    {
+      "epoch": 1,
+      "file": "epoch-1.bin",
+      "from": 2016,
+      "to": 4031,
+      "lastHash": "00000000000003cce0a1fa7cefe5faa7c5a009512c4fdda6f770a80e374c051e",
+      "bytes": 1138412,
+      "sha256": "ca4f418f6e13f57bed05979e29a306eaecc0c573bd334e19c555d28c1ba23811"
+    }
+  ]
+}

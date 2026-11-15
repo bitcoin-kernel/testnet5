@@ -55,7 +55,7 @@
 
 <main class="wrap">
   <h1>Testnet5, validated in your tab.</h1>
-  <p class="sub">Every block since genesis, checked here by the bitcoin-kernel engine under testnet5's rules, BIP54 included. The servers below only carry the blocks; a bad one would fail in this page.</p>
+  <p class="sub">Every block since genesis, checked here by the bitcoin-kernel engine under testnet5's rules, BIP54 included. Blocks arrive in bulk, one file per difficulty period, served with this page; a bad block in a file would fail here.</p>
 
   <section class="panel" aria-live="polite">
     <div class="head"><span class="dot" id="dot"></span><span>Node</span><span id="state">starting…</span></div>
@@ -65,7 +65,7 @@
       <div class="stat"><div class="l">Unspent coins</div><div class="v" id="coins">–</div></div>
       <div class="stat"><div class="l">tBTC5 in coins</div><div class="v" id="total">–</div></div>
       <div class="stat"><div class="l">Validation time</div><div class="v" id="time">–</div></div>
-      <div class="stat"><div class="l">Blocks from cache / network</div><div class="v" id="from">–</div></div>
+      <div class="stat"><div class="l">Blocks from cache / files</div><div class="v" id="from">–</div></div>
       <div class="stat"><div class="l">Tip</div><div class="v m" id="tip">–</div></div>
     </div>
     <div class="look">
@@ -78,17 +78,17 @@
   <div class="how">
     <div><h3>Rules, not trust</h3><p>Proof of work, difficulty with no 20-minute exception, scripts, and BIP54's cleanups: timewarp, 64-byte transactions, coinbase locktime, sigop limit.</p></div>
     <div><h3>Small enough</h3><p>Testnet5 is a few thousand blocks, so the whole set of unspent coins fits in a tab. No snapshot, nothing to trust about the starting point.</p></div>
-    <div><h3>Kept locally</h3><p>Blocks stay in this browser. A reload checks them again from the local copy and only fetches what is new.</p></div>
+    <div><h3>Kept locally</h3><p>Blocks stay in this browser. A reload checks them again from the local copy and downloads nothing.</p></div>
   </div>
 
-  <footer>Blocks from <a href="https://libbitcoin.info/">libbitcoin</a> servers (wormer, carmine). Engine: <a href="https://github.com/bitcoin-desktop/schema">bitcoin-desktop/schema</a> v0.0.27. Node: <a href="https://github.com/bitcoin-kernel/testnet5">bitcoin-kernel/testnet5</a>.</footer>
+  <footer>Blocks: sealed epoch files served with this page (<a href="./epochs/index.json">index</a>). Network height: one request per visit to a <a href="https://libbitcoin.info/">libbitcoin</a> server. Engine: <a href="https://github.com/bitcoin-desktop/schema">bitcoin-desktop/schema</a> v0.0.27. Node: <a href="https://github.com/bitcoin-kernel/testnet5">bitcoin-kernel/testnet5</a>.</footer>
 </main>
 
 <script type="module">
   const $ = (id) => document.getElementById(id);
   const fmt = (n) => Number(n).toLocaleString();
   const log = (s) => { $('log').textContent += `${new Date().toLocaleTimeString()} ${s}\n`; $('log').scrollTop = 1e9; };
-  let node, top = null;
+  let node;
   function render(n) {
     const c = n.chain; if (!c || c.height < 0) return;
     let total = 0; for (const coin of c.utxo.values()) total += coin.output.value;
@@ -96,16 +96,16 @@
     $('coins').textContent = fmt(c.utxo.size);
     $('total').textContent = fmt(total / 1e8);
     $('time').textContent = `${(n.stats.validateMs / 1000).toFixed(1)} s`;
-    $('from').textContent = `${fmt(n.stats.cached)} / ${fmt(n.stats.fetched)}`;
+    $('from').textContent = `${fmt(n.stats.cached)} / ${fmt(n.stats.fromEpochs)}`;
     $('tip').textContent = c.tip;
+    const top = n.networkTip;
     if (top) $('bar').style.width = `${Math.min(100, (c.height / top) * 100)}%`;
-    const live = !n.busy && n.source;
-    $('dot').className = 'dot' + (live ? ' ok' : '');
-    $('state').textContent = live ? `following, from ${new URL(n.source).host}` : 'syncing…';
+    $('dot').className = 'dot' + (n.busy ? '' : ' ok');
+    $('state').textContent = n.busy ? 'validating…'
+      : `validated to ${fmt(c.height)}` + (top ? (top > c.height ? `; the network is at ${fmt(top)} (${fmt(top - c.height)} newer blocks not in the files yet)` : '; level with the network') : '');
   }
   try {
-    const { BrowserNode, SOURCES } = await import('./src/browser.js');
-    try { top = Number(await (await fetch(`${SOURCES[0]}/top`, { headers: { accept: 'application/json' } })).json()); } catch {}
+    const { BrowserNode } = await import('./src/browser.js');
     node = new BrowserNode({ onUpdate: render, log });
     log('loading the engine…');
     await node.start();

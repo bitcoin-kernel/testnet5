@@ -6,10 +6,10 @@ Testnet5 is new and small: a few thousand blocks, almost all of them coinbases, 
 
 **Status: all four steps working.** A node that syncs testnet5 from genesis and validates every block in full: headers, structure, scripts, and BIP54 (as an engine overlay, `src/bip54.js` + `src/bip54.jsonld`). It runs two ways:
 
-- **In a browser tab:** [bitcoin-kernel.com/testnet5](https://bitcoin-kernel.com/testnet5/). Raw blocks come over HTTPS from the libbitcoin servers, byte-identical to Core's, and the tab checks each one. Blocks are kept in IndexedDB, so a reload validates the local copy again and fetches only what is new.
-  - First visit: 4,207 blocks in about 85 s, almost all of it download; validation took 3.9 s.
-  - A reload: about 4 s.
-  - The final coin set equalled Core's: 13,626 coins, 210,350 tBTC5, same tip.
+- **In a browser tab:** [bitcoin-kernel.com/testnet5](https://bitcoin-kernel.com/testnet5/). Blocks arrive in bulk, as sealed epoch files: one per completed difficulty period, served with the page (`epochs/`, built by `tools/build-epochs.js`). The tab checks each file's SHA-256 against `epochs/index.json`, then validates every block in it. Blocks are kept in IndexedDB, so a reload validates the local copy again and downloads nothing.
+  - A first visit downloads 2.3 MB (blocks 0–4,031) and validates them in about 7 s.
+  - The page asks other people's servers at most once per visit, and only for the network height, to show how far the files are behind. It never fetches block by block.
+
 - **On Node, over P2P,** from lapis and the libbitcoin nodes. It follows the tip, switching to a branch with more work when it must, keeps a mempool, relays transactions, and serves an esplora-compatible API.
   - Genesis to tip takes about 12 s. The result equals Core's coin set and chain work.
   - Every API answer matched an RPC-backed esplora server.
