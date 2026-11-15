@@ -4,7 +4,13 @@ A Bitcoin **testnet5** ([BIP95](https://github.com/bitcoin/bips/blob/master/bip-
 
 Testnet5 is new and small: a few thousand blocks, almost all of them coinbases, paying about a hundred addresses. So the node needs no snapshot. It syncs from genesis, checks every rule on every block, and keeps the whole set of unspent coins in memory.
 
-**Status: starting.** Nothing runs yet.
+**Status: step 1 of 4.** The engine validates the whole testnet5 header chain, genesis to tip, with headers fetched from a local node over RPC. The latest run checked 4,204 headers in about 0.2 s; every hash and the total chain work match Bitcoin Core.
+
+```sh
+npm install
+npm test                    # header rules on real headers 0..2100, plus tampered ones
+node src/check-headers.js   # the whole chain from a local testnet5 node (cookie auth)
+```
 
 ## Aim
 

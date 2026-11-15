@@ -1,0 +1,14 @@
+{
+  "name": "bitcoin-kernel-testnet5",
+  "version": "0.0.1",
+  "private": true,
+  "description": "A Bitcoin testnet5 (BIP95) node in plain JavaScript, on the bitcoin-kernel engine",
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "dependencies": {
+    "@bitcoin-desktop/schema": "github:bitcoin-desktop/schema#gh-pages"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}
