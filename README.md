@@ -4,14 +4,24 @@ A Bitcoin **testnet5** ([BIP95](https://github.com/bitcoin/bips/blob/master/bip-
 
 Testnet5 is new and small: a few thousand blocks, almost all of them coinbases, paying about a hundred addresses. So the node needs no snapshot. It syncs from genesis, checks every rule on every block, and keeps the whole set of unspent coins in memory.
 
-**Status: step 2 of 4.** The node validates every testnet5 block from genesis: headers, block structure, scripts, and BIP54's rules (the latter as an engine overlay, `src/bip54.js` + `src/bip54.jsonld`), keeping the set of unspent coins in memory. Blocks come from a local node over RPC for now. The latest run checked 4,205 blocks (4,280 transactions) in about 7 s and ended with exactly the coin set Core reports: 13,614 coins worth 210,250 tBTC5.
+**Status: step 3 of 4.** A running node. It syncs testnet5 from genesis over P2P from lapis and the libbitcoin nodes, and validates every block in full: headers, structure, scripts, and BIP54 (as an engine overlay, `src/bip54.js` + `src/bip54.jsonld`). It follows the tip, switching to a branch with more work when it must, keeps a mempool, relays transactions, and serves an esplora-compatible API.
+
+- **Latest sync:** genesis to 4,206 in 12.5 s with no RPC. It ended with exactly Core's coin set (13,614 coins, 210,250 tBTC5) and Core's chain work.
+- **API checked against an RPC-backed esplora server:** every tx, hex, status, address and UTXO answer is identical.
+- **Broadcast checked:** a fund-agent payment sent through the API reached Core's and libbitcoin's mempools over P2P.
 
 ```sh
 npm install
-npm test                    # header and BIP54 rules on real testnet5 headers and blocks, plus tampered copies
-node src/check-headers.js   # every header from a local testnet5 node (cookie auth)
-node src/check-blocks.js    # every block, then the coin set compared with Core's gettxoutsetinfo
+node src/node.js --api 3497   # sync, follow, serve http://127.0.0.1:3497 (esplora API)
+npm test                      # header and BIP54 rules on real testnet5 headers and blocks, plus tampered copies
+node src/check-blocks.js      # cross-check: every block via a local Core node's RPC, coin set vs gettxoutsetinfo
 ```
+
+Point tools at it: `GITMARK_EXPLORER=http://127.0.0.1:3497`, `FUND_AGENT_TBTC5_API=http://127.0.0.1:3497`.
+
+**Limits for now:**
+- Mempool admission checks inputs and amounts, but leaves scripts to the peers.
+- Everything is held in memory, so a restart syncs again (about 12 s at this size).
 
 ## Aim
 

@@ -6,7 +6,8 @@
   "type": "module",
   "license": "AGPL-3.0-only",
   "dependencies": {
-    "@bitcoin-desktop/schema": "github:bitcoin-desktop/schema#gh-pages"
+    "@bitcoin-desktop/schema": "github:bitcoin-desktop/schema#gh-pages",
+    "bitcoin-kernel-node": "github:bitcoin-kernel/node#gh-pages"
   },
   "scripts": {
     "test": "node --test"
