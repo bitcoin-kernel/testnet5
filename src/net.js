@@ -7,8 +7,8 @@ const MSG_TX = 1, MSG_BLOCK = 2, WITNESS = 0x40000000;
 const ZERO = '0'.repeat(64);
 
 export class Net {
-  constructor(k, chain, { peers = PEERS, port = k.params.port, log = console.log } = {}) {
-    Object.assign(this, { k, chain, hosts: peers, port, log });
+  constructor(k, chain, { peers = PEERS, port = k.params.port, log = console.log, store = null } = {}) {
+    Object.assign(this, { k, chain, hosts: peers, port, log, store });
     this.peers = new Map();   // host -> Peer
     this.mempool = new Map(); // txid -> tx
     this.syncing = false;
@@ -103,7 +103,7 @@ export class Net {
     if (this.syncing) return; this.syncing = true;
     try {
       const peer = this.#peer();
-      if (this.chain.height < 0) this.chain.setGenesis((await this.#getBlocks(peer, [this.k.params.genesisHash]))[0]);
+      if (this.chain.height < 0) { const g = (await this.#getBlocks(peer, [this.k.params.genesisHash]))[0]; this.chain.setGenesis(g); this.#keep(g); }
       for (;;) {
         const hdrs = await this.#getHeaders(peer, this.chain.locator());
         if (!hdrs.length) break;
@@ -119,12 +119,14 @@ export class Net {
           this.log(`reorg: back to ${fork} (dropping ${this.chain.height - fork} block(s))`);
           const dropped = this.chain.blocks.slice(fork + 1);
           this.chain.truncate(fork);
+          this.store?.truncate(fork);
           for (const b of dropped) for (const tx of b.transactions.slice(1)) this.mempool.set(this.k.codec.txid(tx), tx);
         }
         for (let i = 0; i < fresh.length; i += 200) {
           const want = fresh.slice(i, i + 200).map((h) => this.k.codec.blockHash(h));
           for (const b of await this.#getBlocks(peer, want)) {
             this.chain.connect(b);
+            this.#keep(b);
             for (const tx of b.transactions.slice(1)) this.mempool.delete(this.k.codec.txid(tx));
           }
         }
@@ -132,6 +134,9 @@ export class Net {
         for (const [id, tx] of this.mempool) { this.mempool.delete(id); if (!this.check(tx)) this.mempool.set(id, tx); }
         if (hdrs.length < 2000) break;
       }
-    } finally { this.syncing = false; }
+    } finally { this.syncing = false; this.store?.sync(); }
   }
+
+  // a block that just validated and connected goes to disk, as the raw bytes it came as
+  #keep(block) { this.store?.append(Buffer.from(this.k.codec.encode('Block', block))); }
 }

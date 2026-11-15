@@ -12,6 +12,7 @@ Testnet5 is new and small: a few thousand blocks, almost all of them coinbases, 
 
 - **On Node, over P2P,** from lapis and the libbitcoin nodes. It follows the tip, switching to a branch with more work when it must, keeps a mempool, relays transactions, and serves an esplora-compatible API.
   - Genesis to tip takes about 12 s. The result equals Core's coin set and chain work.
+  - Validated blocks are kept in `data/blocks.bin` (same format as the epoch files). A restart validates them again from disk (about 7 s) and asks peers only for newer blocks.
   - Every API answer matched an RPC-backed esplora server.
   - A fund-agent payment broadcast through it reached Core's and libbitcoin's mempools.
 
