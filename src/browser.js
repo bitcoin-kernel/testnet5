@@ -5,13 +5,15 @@
 //
 // Blocks after the last sealed file come the same way, as one "current" file on our R2 bucket, checked
 // again every 10 minutes. Other people's servers are asked at most once per page load, and only for the
-// network height. Blocks are never fetched one by one.
+// network height. Blocks are never fetched one by one. The network height comes from Nostr: the signed
+// NIP-333 headers event for tbtc5, checked in the tab (src/nip333.js). No Bitcoin server is asked at all.
 const ENGINE = 'https://cdn.jsdelivr.net/gh/bitcoin-desktop/schema@v0.0.27';
 const { createKernel } = await import(`${ENGINE}/codec/kernel.js`);
 const { bip54 } = await import('./bip54.js');
 const { Chain } = await import('./chain.js');
+const { nostrTip } = await import('./nip333.js');
+const { verifyNostrEvent } = await import(`${ENGINE}/codec/nostr.js`);
 
-export const TIP_SOURCE = 'https://wormer.libbitcoin.net:58143/v1/top';
 const EPOCHS = new URL('../epochs/', import.meta.url);
 // the open epoch (blocks after the last sealed file), rebuilt by tools/publish-current.js on our R2 bucket
 export const CURRENT = 'https://pub-8cae8bad22cf4f44b22188af9b1c0064.r2.dev/testnet5/';
@@ -65,9 +67,8 @@ export class BrowserNode {
     this.chain = new Chain(this.k);
     try { this.db = await openDb(); } catch { this.db = null; } // private windows: no cache, still works
     this.busy = true;
-    // the one outside request: the tip height, to say how far behind we are
-    fetch(TIP_SOURCE, { headers: { accept: 'application/json' } }).then((r) => r.json())
-      .then((t) => { this.networkTip = Number(t); this.onUpdate(this); }).catch(() => {});
+    // the network's tip, from the NIP-333 headers event on Nostr relays
+    this.checkTip();
     // 1. the local copy, each block validated again
     const cached = this.db ? await allCached(this.db) : [];
     let h = 0;
@@ -102,7 +103,17 @@ export class BrowserNode {
     await this.tail();
     this.busy = false;
     this.onUpdate(this);
-    this.timer = setInterval(() => this.tail().then(() => this.onUpdate(this)).catch((e) => this.log(e.message)), 600000);
+    this.timer = setInterval(() => { this.checkTip(); this.tail().then(() => this.onUpdate(this)).catch((e) => this.log(e.message)); }, 600000);
+  }
+
+  // Ask the relays for the signed tbtc5 headers event; it counts only once checked (signature, author, PoW, links).
+  async checkTip() {
+    try {
+      const t = await nostrTip(this.k, verifyNostrEvent);
+      if (!t) return;
+      this.nostr = t; this.networkTip = t.tip;
+      this.onUpdate(this);
+    } catch (e) { this.log(`nostr: ${e.message}`); }
   }
 
   // Blocks after the last sealed epoch, from one file on our bucket. Only fetched when it has blocks we lack.

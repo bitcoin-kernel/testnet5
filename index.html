@@ -81,7 +81,7 @@
     <div><h3>Kept locally</h3><p>Blocks stay in this browser. A reload checks them again from the local copy and downloads nothing.</p></div>
   </div>
 
-  <footer>Blocks: sealed epoch files served with this page (<a href="./epochs/index.json">index</a>), then the newest ones as one file from our bucket, refreshed every 10 minutes (<a href="https://pub-8cae8bad22cf4f44b22188af9b1c0064.r2.dev/testnet5/current.json">current</a>). Network height: one request per visit to a <a href="https://libbitcoin.info/">libbitcoin</a> server. Engine: <a href="https://github.com/bitcoin-desktop/schema">bitcoin-desktop/schema</a> v0.0.27. Node: <a href="https://github.com/bitcoin-kernel/testnet5">bitcoin-kernel/testnet5</a>.</footer>
+  <footer>Blocks: sealed epoch files served with this page (<a href="./epochs/index.json">index</a>), then the newest ones as one file from our bucket, refreshed every 10 minutes (<a href="https://pub-8cae8bad22cf4f44b22188af9b1c0064.r2.dev/testnet5/current.json">current</a>). Network tip: the signed NIP-333 headers event (<code>d=tbtc5</code>) on Nostr relays, checked in the tab. Engine: <a href="https://github.com/bitcoin-desktop/schema">bitcoin-desktop/schema</a> v0.0.27. Node: <a href="https://github.com/bitcoin-kernel/testnet5">bitcoin-kernel/testnet5</a>.</footer>
 </main>
 
 <script type="module">
@@ -102,7 +102,8 @@
     if (top) $('bar').style.width = `${Math.min(100, (c.height / top) * 100)}%`;
     $('dot').className = 'dot' + (n.busy ? '' : ' ok');
     $('state').textContent = n.busy ? 'validating…'
-      : `validated to ${fmt(c.height)}` + (top ? (top > c.height ? `; the network is at ${fmt(top)} (${fmt(top - c.height)} newer, in the next file update)` : '; level with the network') : '');
+      : `validated to ${fmt(c.height)}` + (top ? (top > c.height ? `; Nostr says the network is at ${fmt(top)} (${fmt(top - c.height)} newer, in the next file update)`
+        : top === c.height ? (n.nostr.hash === c.tip ? `; level with the signed tip on Nostr (${n.nostr.relays} relay${n.nostr.relays === 1 ? '' : 's'})` : '; DIFFERENT tip from Nostr at this height') : '; ahead of the tip on Nostr') : '');
   }
   try {
     const { BrowserNode } = await import('./src/browser.js');

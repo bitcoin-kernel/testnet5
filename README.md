@@ -8,7 +8,7 @@ Testnet5 is new and small: a few thousand blocks, almost all of them coinbases, 
 
 - **In a browser tab:** [bitcoin-kernel.com/testnet5](https://bitcoin-kernel.com/testnet5/). Blocks arrive in bulk, never one by one. There is one sealed file per completed difficulty period, served with the page (`epochs/`, built by `tools/build-epochs.js`). The newest blocks come as one more file, `current.bin`, which `tools/publish-current.js` rebuilds on our R2 bucket whenever the tip moves (checked every 10 minutes). The tab checks each file's SHA-256 and validates every block in it. Blocks are kept in IndexedDB, so a reload validates the local copy again and downloads nothing.
   - A first visit downloads about 2.6 MB and reaches the tip in about 5 s.
-  - The page asks other people's servers at most once per visit, for the network height only.
+  - The network tip comes from Nostr: a signed NIP-333 headers event (kind 33333, `d=tbtc5`), published by `tools/publish-nip333.js` from a validated window of the last 12 headers. The tab checks the signature, the pinned author and every header's proof of work and links. No Bitcoin server is asked anything.
 
 - **On Node, over P2P,** from lapis and the libbitcoin nodes. It follows the tip, switching to a branch with more work when it must, keeps a mempool, relays transactions, and serves an esplora-compatible API.
   - Genesis to tip takes about 12 s. The result equals Core's coin set and chain work.
