@@ -27,7 +27,6 @@ Point tools at it: `GITMARK_EXPLORER=http://127.0.0.1:3497`, `FUND_AGENT_TBTC5_A
 
 **Limits for now:**
 - Mempool admission checks inputs and amounts, but leaves scripts to the peers.
-- Everything is held in memory, so a restart syncs again (about 12 s at this size).
 
 ## Aim
 
