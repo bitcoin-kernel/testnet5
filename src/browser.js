@@ -3,8 +3,9 @@
 // engine and BIP54, so the files are transport, not trust. Validated blocks are kept in IndexedDB,
 // so a reload re-validates the local copy and downloads nothing.
 //
-// Other people's servers are asked at most once per page load, and only for the tip height
-// (to show how far the epoch files are behind). Blocks are never fetched one by one.
+// Blocks after the last sealed file come the same way, as one "current" file on our R2 bucket, checked
+// again every 10 minutes. Other people's servers are asked at most once per page load, and only for the
+// network height. Blocks are never fetched one by one.
 const ENGINE = 'https://cdn.jsdelivr.net/gh/bitcoin-desktop/schema@v0.0.27';
 const { createKernel } = await import(`${ENGINE}/codec/kernel.js`);
 const { bip54 } = await import('./bip54.js');
@@ -12,6 +13,8 @@ const { Chain } = await import('./chain.js');
 
 export const TIP_SOURCE = 'https://wormer.libbitcoin.net:58143/v1/top';
 const EPOCHS = new URL('../epochs/', import.meta.url);
+// the open epoch (blocks after the last sealed file), rebuilt by tools/publish-current.js on our R2 bucket
+export const CURRENT = 'https://pub-8cae8bad22cf4f44b22188af9b1c0064.r2.dev/testnet5/';
 
 const json = async (url) => { const r = await fetch(url); if (!r.ok) throw new Error(`${url}: ${r.status}`); return r.json(); };
 const hex = (bytes) => Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
@@ -95,8 +98,40 @@ export class BrowserNode {
       if (this.chain.tip !== e.lastHash) throw new Error(`epoch ${e.epoch} ends at ${this.chain.tip}, the index says ${e.lastHash}`);
       if (this.db) await store(this.db, 'readwrite', (s) => { for (const [height, b] of batch) s.put(b, height); });
     }
+    // 3. the open epoch, then again every 10 minutes
+    await this.tail();
     this.busy = false;
     this.onUpdate(this);
+    this.timer = setInterval(() => this.tail().then(() => this.onUpdate(this)).catch((e) => this.log(e.message)), 600000);
+  }
+
+  // Blocks after the last sealed epoch, from one file on our bucket. Only fetched when it has blocks we lack.
+  async tail() {
+    const meta = await json(new URL('current.json', CURRENT));
+    this.currentTo = meta.to;
+    if (meta.to <= this.chain.height) return;
+    if (meta.from > this.chain.height + 1) throw new Error(`current.json starts at ${meta.from}; we are at ${this.chain.height}`);
+    const buf = new Uint8Array(await (await fetch(new URL(meta.file, CURRENT), { cache: 'no-cache' })).arrayBuffer());
+    const digest = hex(new Uint8Array(await crypto.subtle.digest('SHA-256', buf)));
+    if (digest !== meta.sha256) { this.log('current.bin changed under us; trying again later'); return; }
+    const blocks = splitEpoch(buf), batch = [];
+    for (let i = this.chain.height + 1 - meta.from; i < blocks.length; i++) {
+      const height = meta.from + i;
+      try { this.#connect(blocks[i], height); }
+      catch (e) {
+        // the published branch does not build on ours: a reorg. Roll back a few and let the next round refill.
+        if (!/prev-link/.test(e.message)) throw e;
+        const back = Math.max(meta.from - 1, this.chain.height - 6);
+        this.log(`reorg: rolling back to ${back}`);
+        this.chain.truncate(back);
+        if (this.db) await store(this.db, 'readwrite', (s) => s.delete(IDBKeyRange.lowerBound(back + 1)));
+        return;
+      }
+      this.stats.fromCurrent = (this.stats.fromCurrent ?? 0) + 1;
+      batch.push([height, blocks[i]]);
+    }
+    if (this.db) await store(this.db, 'readwrite', (s) => { for (const [height, b] of batch) s.put(b, height); });
+    this.log(`current: validated to ${this.chain.height}`);
   }
 
   #connect(blockHex, height) {

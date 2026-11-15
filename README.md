@@ -6,9 +6,9 @@ Testnet5 is new and small: a few thousand blocks, almost all of them coinbases, 
 
 **Status: all four steps working.** A node that syncs testnet5 from genesis and validates every block in full: headers, structure, scripts, and BIP54 (as an engine overlay, `src/bip54.js` + `src/bip54.jsonld`). It runs two ways:
 
-- **In a browser tab:** [bitcoin-kernel.com/testnet5](https://bitcoin-kernel.com/testnet5/). Blocks arrive in bulk, as sealed epoch files: one per completed difficulty period, served with the page (`epochs/`, built by `tools/build-epochs.js`). The tab checks each file's SHA-256 against `epochs/index.json`, then validates every block in it. Blocks are kept in IndexedDB, so a reload validates the local copy again and downloads nothing.
-  - A first visit downloads 2.3 MB (blocks 0–4,031) and validates them in about 7 s.
-  - The page asks other people's servers at most once per visit, and only for the network height, to show how far the files are behind. It never fetches block by block.
+- **In a browser tab:** [bitcoin-kernel.com/testnet5](https://bitcoin-kernel.com/testnet5/). Blocks arrive in bulk, never one by one. There is one sealed file per completed difficulty period, served with the page (`epochs/`, built by `tools/build-epochs.js`). The newest blocks come as one more file, `current.bin`, which `tools/publish-current.js` rebuilds on our R2 bucket whenever the tip moves (checked every 10 minutes). The tab checks each file's SHA-256 and validates every block in it. Blocks are kept in IndexedDB, so a reload validates the local copy again and downloads nothing.
+  - A first visit downloads about 2.6 MB and reaches the tip in about 5 s.
+  - The page asks other people's servers at most once per visit, for the network height only.
 
 - **On Node, over P2P,** from lapis and the libbitcoin nodes. It follows the tip, switching to a branch with more work when it must, keeps a mempool, relays transactions, and serves an esplora-compatible API.
   - Genesis to tip takes about 12 s. The result equals Core's coin set and chain work.
