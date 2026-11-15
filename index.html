@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Testnet5 node</title>
+<meta name="description" content="A Bitcoin testnet5 (BIP95) node in your browser tab: every block validated from genesis with the bitcoin-kernel engine and BIP54.">
+<style>
+  :root{--bg:#f7f8f3;--fg:#17211b;--mut:#5d685f;--bd:#dde3da;--pan:#fffdf8;--ac:#ed7c2c;--ac2:#b95216;--good:#2f7a45;--bad:#b42318;--soft:#fff0e3;
+    --display:Manrope,"DM Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--body:"DM Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--shadow:0 30px 80px rgba(36,51,40,.09),0 3px 12px rgba(36,51,40,.04)}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121815;--fg:#e8efe9;--mut:#9aa79d;--bd:#2a352e;--pan:#18201b;--ac:#f08a3e;--ac2:#f2a065;--good:#6cc48a;--bad:#ef6b5f;--soft:#2b2015;--shadow:none}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 var(--body);-webkit-font-smoothing:antialiased}
+  a{color:var(--ac2);text-underline-offset:3px}
+  .wrap{max-width:920px;margin:0 auto;padding:0 16px}
+  nav{position:sticky;top:0;z-index:10;border-bottom:1px solid var(--bd);background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(18px)}
+  nav .wrap{display:flex;align-items:center;gap:18px;height:64px}
+  .brand{font:800 20px var(--display);letter-spacing:-.045em;color:var(--fg);text-decoration:none;margin-right:auto}.brand b{color:var(--ac)}
+  nav a:not(.brand){color:var(--mut);font-size:14px;text-decoration:none}nav a:not(.brand):hover{color:var(--fg)}
+  h1{font:700 clamp(36px,6vw,58px)/1.05 var(--display);letter-spacing:-.055em;margin:48px 0 0}
+  .sub{color:var(--mut);font-size:18px;max-width:40rem;margin:16px 0 0}
+  .panel{margin:32px 0 0;border:1px solid var(--bd);border-radius:22px;background:var(--pan);box-shadow:var(--shadow);overflow:hidden}
+  .head{display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--bd);font:500 12px var(--mono);letter-spacing:.05em;text-transform:uppercase;color:var(--mut)}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--ac);flex:none}.dot.ok{background:var(--good);box-shadow:0 0 0 4px color-mix(in srgb,var(--good) 18%,transparent)}.dot.bad{background:var(--bad)}
+  #state{margin-left:auto;text-transform:none;letter-spacing:0}
+  .bar{height:3px;background:var(--bd)}.bar i{display:block;height:100%;width:0;background:var(--ac);transition:width .3s}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--bd)}
+  .stat{background:var(--pan);padding:18px 20px}
+  .stat .l{font:500 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}
+  .stat .v{font:600 24px var(--display);letter-spacing:-.03em;margin-top:4px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+  .stat .v.m{font:500 13px/1.5 var(--mono);letter-spacing:0}
+  .look{padding:20px;border-top:1px solid var(--bd)}
+  .look form{display:flex;gap:10px}
+  .look input{flex:1;min-width:0;padding:11px 13px;border:1px solid var(--bd);border-radius:10px;background:var(--bg);color:var(--fg);font:14px var(--mono)}
+  .look input:focus{outline:none;border-color:var(--ac);box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 20%,transparent)}
+  .look button{padding:0 18px;border:0;border-radius:10px;background:var(--fg);color:var(--bg);font:600 14px var(--body);cursor:pointer}
+  #result{margin:12px 0 0;font:14px/1.6 var(--mono);color:var(--mut);min-height:1.6em}
+  #result b{color:var(--fg)}
+  #log{margin:0;padding:14px 20px;border-top:1px solid var(--bd);font:12px/1.6 var(--mono);color:var(--mut);max-height:9rem;overflow:auto;white-space:pre-wrap}
+  .how{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:40px 0 0}
+  .how div{padding:20px;border:1px solid var(--bd);border-radius:16px;background:color-mix(in srgb,var(--pan) 60%,transparent)}
+  .how h3{margin:0 0 6px;font:700 17px var(--display);letter-spacing:-.03em}.how p{margin:0;color:var(--mut);font-size:14.5px}
+  footer{margin:48px 0 0;padding:24px 0 40px;border-top:1px solid var(--bd);color:var(--mut);font:12px/1.7 var(--mono)}
+  @media (max-width:700px){.stats{grid-template-columns:1fr 1fr}.how{grid-template-columns:1fr}}
+  @media (max-width:420px){.stats{grid-template-columns:1fr}.look form{flex-direction:column}.look button{padding:11px}}
+</style>
+</head>
+<body>
+<nav><div class="wrap">
+  <a class="brand" href="https://bitcoin-kernel.com/">bitcoin<b>·</b>kernel</a>
+  <a href="https://testnet4.github.io/awesome-testnet5/">About testnet5</a>
+  <a href="https://github.com/bitcoin-kernel/testnet5">Source ↗</a>
+</div></nav>
+
+<main class="wrap">
+  <h1>Testnet5, validated in your tab.</h1>
+  <p class="sub">Every block since genesis, checked here by the bitcoin-kernel engine under testnet5's rules, BIP54 included. The servers below only carry the blocks; a bad one would fail in this page.</p>
+
+  <section class="panel" aria-live="polite">
+    <div class="head"><span class="dot" id="dot"></span><span>Node</span><span id="state">starting…</span></div>
+    <div class="bar"><i id="bar"></i></div>
+    <div class="stats">
+      <div class="stat"><div class="l">Height</div><div class="v" id="height">–</div></div>
+      <div class="stat"><div class="l">Unspent coins</div><div class="v" id="coins">–</div></div>
+      <div class="stat"><div class="l">tBTC5 in coins</div><div class="v" id="total">–</div></div>
+      <div class="stat"><div class="l">Validation time</div><div class="v" id="time">–</div></div>
+      <div class="stat"><div class="l">Blocks from cache / network</div><div class="v" id="from">–</div></div>
+      <div class="stat"><div class="l">Tip</div><div class="v m" id="tip">–</div></div>
+    </div>
+    <div class="look">
+      <form id="look"><input id="addr" placeholder="tb1… address" autocomplete="off" spellcheck="false" aria-label="Address"><button>Look up</button></form>
+      <div id="result"></div>
+    </div>
+    <pre id="log"></pre>
+  </section>
+
+  <div class="how">
+    <div><h3>Rules, not trust</h3><p>Proof of work, difficulty with no 20-minute exception, scripts, and BIP54's cleanups: timewarp, 64-byte transactions, coinbase locktime, sigop limit.</p></div>
+    <div><h3>Small enough</h3><p>Testnet5 is a few thousand blocks, so the whole set of unspent coins fits in a tab. No snapshot, nothing to trust about the starting point.</p></div>
+    <div><h3>Kept locally</h3><p>Blocks stay in this browser. A reload checks them again from the local copy and only fetches what is new.</p></div>
+  </div>
+
+  <footer>Blocks from <a href="https://libbitcoin.info/">libbitcoin</a> servers (wormer, carmine). Engine: <a href="https://github.com/bitcoin-desktop/schema">bitcoin-desktop/schema</a> v0.0.27. Node: <a href="https://github.com/bitcoin-kernel/testnet5">bitcoin-kernel/testnet5</a>.</footer>
+</main>
+
+<script type="module">
+  const $ = (id) => document.getElementById(id);
+  const fmt = (n) => Number(n).toLocaleString();
+  const log = (s) => { $('log').textContent += `${new Date().toLocaleTimeString()} ${s}\n`; $('log').scrollTop = 1e9; };
+  let node, top = null;
+  function render(n) {
+    const c = n.chain; if (!c || c.height < 0) return;
+    let total = 0; for (const coin of c.utxo.values()) total += coin.output.value;
+    $('height').textContent = fmt(c.height);
+    $('coins').textContent = fmt(c.utxo.size);
+    $('total').textContent = fmt(total / 1e8);
+    $('time').textContent = `${(n.stats.validateMs / 1000).toFixed(1)} s`;
+    $('from').textContent = `${fmt(n.stats.cached)} / ${fmt(n.stats.fetched)}`;
+    $('tip').textContent = c.tip;
+    if (top) $('bar').style.width = `${Math.min(100, (c.height / top) * 100)}%`;
+    const live = !n.busy && n.source;
+    $('dot').className = 'dot' + (live ? ' ok' : '');
+    $('state').textContent = live ? `following, from ${new URL(n.source).host}` : 'syncing…';
+  }
+  try {
+    const { BrowserNode, SOURCES } = await import('./src/browser.js');
+    try { top = Number(await (await fetch(`${SOURCES[0]}/top`, { headers: { accept: 'application/json' } })).json()); } catch {}
+    node = new BrowserNode({ onUpdate: render, log });
+    log('loading the engine…');
+    await node.start();
+    log(`synced: ${fmt(node.chain.height)} blocks valid, ${fmt(node.chain.utxo.size)} coins`);
+    render(node);
+  } catch (e) {
+    $('dot').className = 'dot bad'; $('state').textContent = 'stopped'; log(`error: ${e.message}`);
+  }
+  $('look').addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const a = $('addr').value.trim();
+    if (!node?.chain || !a) return;
+    const b = node.balance(a);
+    $('result').innerHTML = b.txs ? `<b>${fmt(b.value / 1e8)} tBTC5</b> in ${fmt(b.coins)} coins (${fmt(b.mature / 1e8)} spendable now), ${fmt(b.txs)} transactions` : 'nothing for that address on testnet5';
+  });
+</script>
+</body>
+</html>

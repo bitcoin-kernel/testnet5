@@ -5,7 +5,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createKernel } from '@bitcoin-desktop/schema/codec/kernel.js';
-import { loadBip54, sigOpCount, spentSigOps } from '../src/bip54.js';
+import { sigOpCount, spentSigOps } from '../src/bip54.js';
+import { loadBip54 } from '../src/kernel.js';
 
 const load = async (p) => JSON.parse(await readFile(new URL(import.meta.resolve('@bitcoin-desktop/schema/' + p)), 'utf8'));
 const fixture = (f) => readFile(new URL(`./fixtures/${f}`, import.meta.url), 'utf8');

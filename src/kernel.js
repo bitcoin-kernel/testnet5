@@ -3,8 +3,9 @@
 import { readFile } from 'node:fs/promises';
 import { createKernel } from '@bitcoin-desktop/schema/codec/kernel.js';
 import { P2pEngine } from '@bitcoin-desktop/schema/codec/p2p.js';
-import { loadBip54 } from './bip54.js';
+import { bip54 } from './bip54.js';
 
+export const loadBip54 = async () => bip54(JSON.parse(await readFile(new URL('./bip54.jsonld', import.meta.url), 'utf8')));
 const load = async (p) => JSON.parse(await readFile(new URL(import.meta.resolve('@bitcoin-desktop/schema/' + p)), 'utf8'));
 
 export async function loadKernel() {

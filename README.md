@@ -4,11 +4,16 @@ A Bitcoin **testnet5** ([BIP95](https://github.com/bitcoin/bips/blob/master/bip-
 
 Testnet5 is new and small: a few thousand blocks, almost all of them coinbases, paying about a hundred addresses. So the node needs no snapshot. It syncs from genesis, checks every rule on every block, and keeps the whole set of unspent coins in memory.
 
-**Status: step 3 of 4.** A running node. It syncs testnet5 from genesis over P2P from lapis and the libbitcoin nodes, and validates every block in full: headers, structure, scripts, and BIP54 (as an engine overlay, `src/bip54.js` + `src/bip54.jsonld`). It follows the tip, switching to a branch with more work when it must, keeps a mempool, relays transactions, and serves an esplora-compatible API.
+**Status: all four steps working.** A node that syncs testnet5 from genesis and validates every block in full: headers, structure, scripts, and BIP54 (as an engine overlay, `src/bip54.js` + `src/bip54.jsonld`). It runs two ways:
 
-- **Latest sync:** genesis to 4,206 in 12.5 s with no RPC. It ended with exactly Core's coin set (13,614 coins, 210,250 tBTC5) and Core's chain work.
-- **API checked against an RPC-backed esplora server:** every tx, hex, status, address and UTXO answer is identical.
-- **Broadcast checked:** a fund-agent payment sent through the API reached Core's and libbitcoin's mempools over P2P.
+- **In a browser tab:** [bitcoin-kernel.com/testnet5](https://bitcoin-kernel.com/testnet5/). Raw blocks come over HTTPS from the libbitcoin servers, byte-identical to Core's, and the tab checks each one. Blocks are kept in IndexedDB, so a reload validates the local copy again and fetches only what is new.
+  - First visit: 4,207 blocks in about 85 s, almost all of it download; validation took 3.9 s.
+  - A reload: about 4 s.
+  - The final coin set equalled Core's: 13,626 coins, 210,350 tBTC5, same tip.
+- **On Node, over P2P,** from lapis and the libbitcoin nodes. It follows the tip, switching to a branch with more work when it must, keeps a mempool, relays transactions, and serves an esplora-compatible API.
+  - Genesis to tip takes about 12 s. The result equals Core's coin set and chain work.
+  - Every API answer matched an RPC-backed esplora server.
+  - A fund-agent payment broadcast through it reached Core's and libbitcoin's mempools.
 
 ```sh
 npm install

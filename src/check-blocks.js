@@ -7,7 +7,7 @@
 
 import { readFile } from 'node:fs/promises';
 import { createKernel } from '@bitcoin-desktop/schema/codec/kernel.js';
-import { loadBip54 } from './bip54.js';
+import { loadBip54 } from './kernel.js';
 
 const arg = (name, dflt) => { const i = process.argv.indexOf(name); return i > 0 ? process.argv[i + 1] : dflt; };
 const RPC = arg('--rpc', 'http://127.0.0.1:18352');

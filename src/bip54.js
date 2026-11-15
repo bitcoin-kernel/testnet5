@@ -4,7 +4,7 @@
 // and Consensus::CheckSigopsBIP54 (bad-txns-legacy-sigops). BIP54's timewarp rule needs no code:
 // the engine's timewarp check with maxTimewarp 7200 is it.
 // Written as an overlay so it can move into the engine (bitcoin-desktop/schema) unchanged.
-import { readFile } from 'node:fs/promises';
+// No Node imports: the same file runs in the browser.
 
 export const MAX_TX_BIP54_SIGOPS = 2500;
 const SEQUENCE_FINAL = 0xffffffff;
@@ -84,7 +84,3 @@ export const bip54 = (graph) => ({
     engines.blocks.registerChecks(c.blocks);
   },
 });
-
-export async function loadBip54() {
-  return bip54(JSON.parse(await readFile(new URL('./bip54.jsonld', import.meta.url), 'utf8')));
-}
