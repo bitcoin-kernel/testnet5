@@ -69,6 +69,14 @@ export class Net {
     return inSum >= tx.outputs.reduce((s, o) => s + o.value, 0) ? null : 'outputs exceed inputs';
   }
 
+  // Drop pool entries a new block made invalid (spent inputs, double spends). Works from a snapshot:
+  // deleting and re-adding keys while iterating the live Map re-queues them, and the loop never ends.
+  recheck() {
+    const pool = [...this.mempool];
+    this.mempool.clear();
+    for (const [id, tx] of pool) if (!this.check(tx)) this.mempool.set(id, tx);
+  }
+
   // Broadcast: admit, then announce to every peer by sending the transaction itself.
   broadcast(tx) {
     const why = this.check(tx);
@@ -130,8 +138,7 @@ export class Net {
             for (const tx of b.transactions.slice(1)) this.mempool.delete(this.k.codec.txid(tx));
           }
         }
-        // drop pool entries a new block made invalid (double spends)
-        for (const [id, tx] of this.mempool) { this.mempool.delete(id); if (!this.check(tx)) this.mempool.set(id, tx); }
+        this.recheck();
         if (hdrs.length < 2000) break;
       }
     } finally { this.syncing = false; this.store?.sync(); }
