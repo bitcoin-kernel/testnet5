@@ -19,7 +19,7 @@ export class Net {
     await Promise.all(this.hosts.map((h) => this.#connect(h)));
     if (!this.peers.size) throw new Error('no testnet5 peer reachable');
     await this.sync();
-    this.timer = setInterval(() => this.sync().catch((e) => this.log(`sync: ${e.message}`)), 30000);
+    this.timer = setInterval(() => this.sync().catch((e) => { this.lastError = { at: Date.now(), message: e.message }; this.log(`sync: ${e.message}`); }), 30000);
     this.redial = setInterval(() => this.hosts.filter((h) => !this.peers.has(h)).forEach((h) => this.#connect(h)), 60000);
   }
 
@@ -142,6 +142,7 @@ export class Net {
         this.recheck();
         if (hdrs.length < 2000) break;
       }
+      this.lastSync = { at: Date.now(), height: this.chain.height }; // for GET /status
     } finally { this.syncing = false; this.store?.sync(); }
   }
 
