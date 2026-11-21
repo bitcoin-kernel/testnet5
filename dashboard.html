@@ -142,7 +142,8 @@ function renderStatus(s) {
     stat('peers', String(s.peers.length), s.peers.map((p) => `${p.host.split('.')[0]} ${p.userAgent ?? ''}`).join(' · ') || 'none'),
     stat('mempool', `${s.mempool.txs} tx`, s.sync.syncing ? 'syncing now' : `last sync ${s.sync.lastAt ? ago((Date.now() - Date.parse(s.sync.lastAt)) / 1000) + ' ago' : 'not yet'}`),
     stat('utxo set', `${s.utxo.coins.toLocaleString()} coins`, `${s.utxo.amount.toLocaleString()} tBTC5 · hash_serialized_3 ${s.utxo.hashSerialized3}`),
-    stat('epochs', l ? `${l.epoch} sealed` : 'none sealed', `${l ? `last ${l.from}–${l.to} · ` : ''}period ends at ${e.nextPeriodEnd}, ${e.blocksToGo} to go`),
+    // epochs are numbered from 0 (Core's retarget periods): epoch n is blocks [2016n, 2016n+2015], so n+1 are sealed when n is the last
+    stat('epochs', l ? `${l.epoch + 1} sealed` : 'none sealed', `${l ? `epochs 0–${l.epoch} · last ${l.from}–${l.to} · ` : ''}epoch ${(e.nextPeriodEnd + 1) / INTERVAL - 1} ends at ${e.nextPeriodEnd}, ${e.blocksToGo} to go`),
     stat('node', s.implementation, `up ${ago(s.uptimeSeconds)}${s.store ? ` · ${s.store.blocks.toLocaleString()} blocks · ${(s.store.bytes / 1e6).toFixed(2)} MB` : ''}`),
   );
 }
