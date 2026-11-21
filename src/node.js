@@ -36,6 +36,6 @@ log(`synced to ${chain.height} (${chain.tip.slice(0, 16)}…) in ${((Date.now() 
 let last = chain.height;
 setInterval(() => { if (chain.height !== last) { log(`tip ${chain.height} ${chain.tip.slice(0, 16)}…, ${net.mempool.size} in mempool`); last = chain.height; } }, 5000);
 
-serveApi({ k, chain, net, port: Number(arg('--api', 3497)), host: arg('--host', '127.0.0.1'), log });
+serveApi({ k, chain, net, store, started: t0, port: Number(arg('--api', 3497)), host: arg('--host', '127.0.0.1'), log });
 
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { net.stop(); store.close(); process.exit(0); });

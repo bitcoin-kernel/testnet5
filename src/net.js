@@ -1,6 +1,7 @@
 // Testnet5 over P2P: connect to peers, sync headers and blocks from genesis, follow the tip (with
 // reorgs by most work), and keep a mempool of transactions peers announce or we broadcast.
 import { Peer } from 'bitcoin-kernel-node/src/peer.js';
+export const USER_AGENT = '/bitcoin-kernel-testnet5:0.0.1/'; // also the implementation an attestation names
 
 export const PEERS = ['lapis.erisian.com.au', 'carmine.libbitcoin.net', 'wormer.libbitcoin.net'];
 const MSG_TX = 1, MSG_BLOCK = 2, WITNESS = 0x40000000;
@@ -18,7 +19,7 @@ export class Net {
     await Promise.all(this.hosts.map((h) => this.#connect(h)));
     if (!this.peers.size) throw new Error('no testnet5 peer reachable');
     await this.sync();
-    this.timer = setInterval(() => this.sync().catch((e) => this.log(`sync: ${e.message}`)), 30000);
+    this.timer = setInterval(() => this.sync().catch((e) => { this.lastError = { at: Date.now(), message: e.message }; this.log(`sync: ${e.message}`); }), 30000);
     this.redial = setInterval(() => this.hosts.filter((h) => !this.peers.has(h)).forEach((h) => this.#connect(h)), 60000);
   }
 
@@ -27,7 +28,7 @@ export class Net {
   async #connect(host) {
     const peer = new Peer(this.k.p2p, this.k.codec);
     try {
-      await peer.connect(host, this.port, { userAgent: '/bitcoin-kernel-testnet5:0.0.1/' });
+      await peer.connect(host, this.port, { userAgent: USER_AGENT });
     } catch (e) { peer.close(); return; }
     peer.host = host;
     // unsolicited messages: block/tx announcements and the transactions we asked for
@@ -67,6 +68,14 @@ export class Net {
       inSum += coin.value;
     }
     return inSum >= tx.outputs.reduce((s, o) => s + o.value, 0) ? null : 'outputs exceed inputs';
+  }
+
+  // Drop pool entries a new block made invalid (spent inputs, double spends). Works from a snapshot:
+  // deleting and re-adding keys while iterating the live Map re-queues them, and the loop never ends.
+  recheck() {
+    const pool = [...this.mempool];
+    this.mempool.clear();
+    for (const [id, tx] of pool) if (!this.check(tx)) this.mempool.set(id, tx);
   }
 
   // Broadcast: admit, then announce to every peer by sending the transaction itself.
@@ -130,10 +139,10 @@ export class Net {
             for (const tx of b.transactions.slice(1)) this.mempool.delete(this.k.codec.txid(tx));
           }
         }
-        // drop pool entries a new block made invalid (double spends)
-        for (const [id, tx] of this.mempool) { this.mempool.delete(id); if (!this.check(tx)) this.mempool.set(id, tx); }
+        this.recheck();
         if (hdrs.length < 2000) break;
       }
+      this.lastSync = { at: Date.now(), height: this.chain.height }; // for GET /status
     } finally { this.syncing = false; this.store?.sync(); }
   }
 

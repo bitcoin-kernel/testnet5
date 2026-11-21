@@ -20,7 +20,9 @@ Testnet5 is new and small: a few thousand blocks, almost all of them coinbases, 
 npm install
 node src/node.js --api 3497   # sync, follow, serve http://127.0.0.1:3497 (esplora API)
 npm test                      # header and BIP54 rules on real testnet5 headers and blocks, plus tampered copies
+node src/status.js [--watch 10]  # the running node's state from GET /status: tip, sync, peers, mempool, UTXO set hash (compare with Core's gettxoutsetinfo), epochs
 node src/check-blocks.js      # cross-check: every block via a local Core node's RPC, coin set vs gettxoutsetinfo
+node src/utxo-hash.js --height 2016,4032 [--dump <dir>] [--json]   # UTXO set hash at those heights (Core's hash_serialized_3); --dump writes the snapshot files byte for byte as dumptxoutset does; --json is the report for `assumeutxo attest --from`
 ```
 
 Point tools at it: `GITMARK_EXPLORER=http://127.0.0.1:3497`, `FUND_AGENT_TBTC5_API=http://127.0.0.1:3497`.

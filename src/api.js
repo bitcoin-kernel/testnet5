@@ -4,10 +4,12 @@
 //   GET  /blocks/tip/height  /blocks/tip/hash  /block-height/:h  /block/:hash  /block/:hash/txids
 //   GET  /tx/:txid  /tx/:txid/hex  /tx/:txid/status  /tx/:txid/outspends
 //   GET  /address/:addr  /address/:addr/utxo  /address/:addr/txs
+//   GET  /status        the node's state: tip, sync, peers, mempool, UTXO set hash, epochs (src/status.js)
 //   POST /tx            raw hex body; returns the txid
 import http from 'node:http';
+import { statusOf } from './status.js';
 
-export function serveApi({ k, chain, net, port = 3497, host = '127.0.0.1', log = console.log }) {
+export function serveApi({ k, chain, net, store = null, started = Date.now(), port = 3497, host = '127.0.0.1', log = console.log }) {
   const hex = (tx, legacy = false) => k.codec.encodeHex('Transaction', tx, legacy ? { legacy: true } : {});
   const prevout = (txid, vout) => {
     const at = chain.tx(txid);
@@ -75,6 +77,7 @@ export function serveApi({ k, chain, net, port = 3497, host = '127.0.0.1', log =
         try { return send(res, 200, net.broadcast(tx)); } catch (e) { return send(res, 400, `sendrawtransaction RPC error: {"code":-26,"message":${JSON.stringify(e.message)}}`); }
       }
       if (req.method !== 'GET') return send(res, 405, 'method not allowed');
+      if (p === '/status') return send(res, 200, statusOf({ chain, net, store, started }));
       if (p === '/blocks/tip/height') return send(res, 200, String(chain.height));
       if (p === '/blocks/tip/hash') return send(res, 200, chain.tip);
       if ((m = p.match(/^\/block-height\/(\d+)$/))) return chain.hashes[+m[1]] ? send(res, 200, chain.hashes[+m[1]]) : send(res, 404, 'Block not found');
