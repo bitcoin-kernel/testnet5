@@ -1,6 +1,7 @@
 // Testnet5 over P2P: connect to peers, sync headers and blocks from genesis, follow the tip (with
 // reorgs by most work), and keep a mempool of transactions peers announce or we broadcast.
 import { Peer } from 'bitcoin-kernel-node/src/peer.js';
+export const USER_AGENT = '/bitcoin-kernel-testnet5:0.0.1/'; // also the implementation an attestation names
 
 export const PEERS = ['lapis.erisian.com.au', 'carmine.libbitcoin.net', 'wormer.libbitcoin.net'];
 const MSG_TX = 1, MSG_BLOCK = 2, WITNESS = 0x40000000;
@@ -27,7 +28,7 @@ export class Net {
   async #connect(host) {
     const peer = new Peer(this.k.p2p, this.k.codec);
     try {
-      await peer.connect(host, this.port, { userAgent: '/bitcoin-kernel-testnet5:0.0.1/' });
+      await peer.connect(host, this.port, { userAgent: USER_AGENT });
     } catch (e) { peer.close(); return; }
     peer.host = host;
     // unsolicited messages: block/tx announcements and the transactions we asked for
