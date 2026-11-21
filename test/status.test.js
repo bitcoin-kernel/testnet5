@@ -25,7 +25,9 @@ test('statusOf: tip, peers, UTXO set hash as Core has it, the next period end', 
   assert.equal(s.utxo.coins, 6475);
   assert.equal(s.epochs.nextPeriodEnd, 4031); // at a period end, the next one
   assert.equal(s.epochs.blocksToGo, 2016);
-  assert.equal(s.epochs.lastSealed.to, 4031);
+  // the repo's own epochs/index.json: its last entry, whatever has been sealed (not a fixed height, which goes stale)
+  const index = JSON.parse(readFileSync(new URL('../epochs/index.json', import.meta.url), 'utf8')).epochs.at(-1);
+  assert.deepEqual(s.epochs.lastSealed, { epoch: index.epoch, from: index.from, to: index.to, lastHash: index.lastHash });
   assert.equal(s.peers[0].userAgent, '/Satoshi:32.1.0/');
   assert.equal(s.uptimeSeconds, 60);
   assert.equal(s.sync.lastError, null);
