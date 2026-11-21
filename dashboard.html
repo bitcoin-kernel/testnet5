@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>testnet5 node · dashboard</title>
+<!--
+  A read-only page over a running bitcoin-kernel/testnet5 node's API (GET /status and the esplora calls).
+  It changes nothing and publishes nothing. Self-contained, so it also works opened as a local file.
+  API: ?api=http://127.0.0.1:3497 (the default).
+-->
+<style>
+  :root{--bg:#f7f8f3;--fg:#17211b;--mut:#5d685f;--bd:#dde3da;--pan:#fffdf8;--ac:#ed7c2c;--ac2:#b95216;--good:#2f7a45;--bad:#b42318;--warn:#a15c07;
+    --display:Manrope,"DM Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--body:"DM Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--shadow:0 30px 80px rgba(36,51,40,.09),0 3px 12px rgba(36,51,40,.04)}
+  @media (prefers-color-scheme:dark){:root{--bg:#121815;--fg:#e8efe9;--mut:#9aa79d;--bd:#2a352e;--pan:#18201b;--ac:#f08a3e;--ac2:#f2a065;--good:#6cc48a;--bad:#ef6b5f;--warn:#e0a85a;--shadow:none}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 var(--body);-webkit-font-smoothing:antialiased}
+  a{color:var(--ac2);text-underline-offset:3px}
+  main{max-width:1100px;margin:0 auto;padding:28px 20px 60px}
+  header{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  h1{font:800 26px var(--display);letter-spacing:-.045em;margin:0}h1 b{color:var(--ac)}
+  .api{font:12px var(--mono);color:var(--mut)}
+  .panel{margin:22px 0 0;border:1px solid var(--bd);border-radius:18px;background:var(--pan);box-shadow:var(--shadow);overflow:hidden}
+  .head{display:flex;align-items:center;gap:10px;padding:12px 18px;border-bottom:1px solid var(--bd);font:500 11.5px var(--mono);letter-spacing:.05em;text-transform:uppercase;color:var(--mut)}
+  .head .r{margin-left:auto;text-transform:none;letter-spacing:0}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--mut);flex:none}.dot.ok{background:var(--good)}.dot.bad{background:var(--bad)}.dot.warn{background:var(--warn)}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--bd)}
+  @media (max-width:860px){.stats{grid-template-columns:repeat(2,1fr)}}
+  @media (max-width:520px){.stats{grid-template-columns:1fr}}
+  .stat{background:var(--pan);padding:14px 18px;min-width:0}
+  .stat .l{font:500 10.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}
+  .stat .v{font:650 21px var(--display);letter-spacing:-.03em;margin-top:2px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+  .stat .s{font:12px/1.45 var(--mono);color:var(--mut);overflow-wrap:anywhere}
+  .checks{list-style:none;margin:0;padding:6px 0}
+  .checks li{display:flex;gap:10px;align-items:baseline;padding:7px 18px}
+  .checks li .dot{transform:translateY(1px)}
+  .checks .why{color:var(--mut);font-size:13.5px}
+  table{width:100%;border-collapse:collapse;font:13px var(--mono);font-variant-numeric:tabular-nums}
+  th,td{text-align:left;padding:8px 18px;border-bottom:1px solid var(--bd);white-space:nowrap}
+  th{font-weight:500;color:var(--mut);font-size:11px;letter-spacing:.05em;text-transform:uppercase}
+  td.h{overflow:hidden;text-overflow:ellipsis;max-width:0;width:100%}
+  tr:last-child td{border-bottom:0}
+  .num{text-align:right}
+  .look{display:flex;gap:8px;padding:14px 18px}
+  .look input{flex:1;min-width:0;padding:9px 12px;border:1px solid var(--bd);border-radius:10px;background:var(--bg);color:var(--fg);font:13px var(--mono)}
+  .look input:focus{outline:none;border-color:var(--ac)}
+  .look button{padding:0 16px;border:0;border-radius:10px;background:var(--fg);color:var(--bg);font:600 13px var(--body);cursor:pointer}
+  #detail:empty{display:none}
+  .kv{display:grid;grid-template-columns:max-content 1fr;gap:4px 18px;padding:14px 18px;font:13px/1.5 var(--mono)}
+  .kv dt{color:var(--mut)}.kv dd{margin:0;overflow-wrap:anywhere}
+  .io{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--bd)}
+  .io>div{background:var(--pan);padding:12px 18px;min-width:0}
+  .io h4{margin:0 0 6px;font:500 11px var(--mono);letter-spacing:.05em;text-transform:uppercase;color:var(--mut)}
+  .io p{margin:0 0 8px;font:12.5px/1.5 var(--mono);overflow-wrap:anywhere}
+  .muted{color:var(--mut)}
+  .err{padding:14px 18px;color:var(--bad);font:13px var(--mono)}
+  footer{margin-top:26px;color:var(--mut);font-size:13px}
+  @media (max-width:640px){.io{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>testnet5 <b>node</b></h1><span class="api" id="api"></span></header>
+
+  <section class="panel">
+    <div class="head"><span class="dot" id="live"></span>status<span class="r" id="updated"></span></div>
+    <div class="stats" id="stats"><div class="stat"><div class="l">loading</div><div class="v">…</div></div></div>
+  </section>
+
+  <section class="panel">
+    <div class="head">checks</div>
+    <ul class="checks" id="checks"></ul>
+  </section>
+
+  <section class="panel">
+    <div class="look"><input id="q" placeholder="height, block hash, txid or address" spellcheck="false"><button id="go">look up</button></div>
+    <div id="detail"></div>
+  </section>
+
+  <section class="panel">
+    <div class="head">recent blocks</div>
+    <table><thead><tr><th>height</th><th>hash</th><th class="num">txs</th><th>time</th></tr></thead><tbody id="blocks"></tbody></table>
+  </section>
+
+  <footer>Read-only: this page only reads the node's API (<code>/status</code> and the esplora calls) and the NIP-333 tip from Nostr relays. Source: <a href="https://github.com/bitcoin-kernel/testnet5">bitcoin-kernel/testnet5</a>.</footer>
+</main>
+
+<script>
+const API = (new URLSearchParams(location.search).get('api') || 'http://127.0.0.1:3497').replace(/\/$/, '');
+const NIP333 = { d: 'tbtc5', pubkey: 'cccccc0a8338a4aba51691f309f2f892c6c58f655a1ec3fc30522c894c166d9c',
+  relays: ['wss://nos.lol', 'wss://relay.primal.net', 'wss://nostr.mom', 'wss://nostr.oxtr.dev'] };
+const INTERVAL = 2016, RECENT = 12;
+const $ = (id) => document.getElementById(id);
+const el = (tag, attrs = {}, ...kids) => { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) k === 'class' ? e.className = v : e.setAttribute(k, v); for (const c of kids) e.append(c ?? ''); return e; };
+const get = async (path, type = 'json') => { const r = await fetch(API + path); if (!r.ok) throw new Error(`${path}: HTTP ${r.status}`); return type === 'json' ? r.json() : r.text(); };
+const ago = (s) => s == null ? '?' : s < 120 ? `${Math.round(s)} s` : s < 7200 ? `${Math.round(s / 60)} min` : s < 172800 ? `${(s / 3600).toFixed(1)} h` : `${(s / 86400).toFixed(1)} d`;
+const btc = (sat) => (sat / 1e8).toLocaleString(undefined, { maximumFractionDigits: 8 });
+const short = (h) => h ? `${h.slice(0, 10)}…${h.slice(-10)}` : '';
+const link = (kind, id, text = id) => el('a', { href: `#${kind}/${id}` }, text);
+$('api').textContent = API;
+
+// ---- the NIP-333 tip, checked here: author, d tag, every header's proof of work and links (not the Schnorr signature) ----
+const hexToBytes = (h) => Uint8Array.from(h.match(/../g), (b) => parseInt(b, 16));
+const toHex = (b) => [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
+const sha256d = async (b) => new Uint8Array(await crypto.subtle.digest('SHA-256', await crypto.subtle.digest('SHA-256', b)));
+async function headerCheck(hex) {
+  const b = hexToBytes(hex), hash = toHex((await sha256d(b)).reverse());
+  const prev = toHex(b.slice(4, 36).reverse()), bits = new DataView(b.buffer).getUint32(72, true);
+  const target = BigInt(bits & 0xffffff) << (8n * (BigInt(bits >>> 24) - 3n));
+  return { hash, prev, pow: BigInt('0x' + hash) <= target };
+}
+function ask(url, ms = 6000) {
+  return new Promise((done) => {
+    const got = []; let ws; const end = () => { clearTimeout(t); try { ws.close(); } catch {} done(got); }; const t = setTimeout(end, ms);
+    try { ws = new WebSocket(url); } catch { return end(); }
+    ws.onopen = () => ws.send(JSON.stringify(['REQ', 'd', { kinds: [33333], authors: [NIP333.pubkey], '#d': [NIP333.d], limit: 3 }]));
+    ws.onmessage = (m) => { try { const x = JSON.parse(m.data); if (x[0] === 'EVENT') got.push(x[2]); if (x[0] === 'EOSE') end(); } catch {} };
+    ws.onerror = end;
+  });
+}
+async function nostrTip() {
+  const events = (await Promise.all(NIP333.relays.map((r) => ask(r)))).flat();
+  let best = null;
+  for (const e of events) {
+    if (e.kind !== 33333 || e.pubkey !== NIP333.pubkey || !e.tags.some((t) => t[0] === 'd' && t[1] === NIP333.d)) continue;
+    const tip = Number(e.tags.find((t) => t[0] === 'tip')?.[1]); if (!Number.isInteger(tip) || !e.content || e.content.length % 160) continue;
+    let ok = true, prevHash = null, last = null;
+    for (let i = 0; i < e.content.length; i += 160) { const h = await headerCheck(e.content.slice(i, i + 160)); if (!h.pow || (prevHash && h.prev !== prevHash)) { ok = false; break; } prevHash = h.hash; last = h; }
+    if (ok && (!best || tip > best.tip)) best = { tip, hash: last.hash, created_at: e.created_at };
+  }
+  return best;
+}
+
+// ---- status and checks ----
+let status = null, lastTip = null, network = null;
+function stat(label, value, sub) { return el('div', { class: 'stat' }, el('div', { class: 'l' }, label), el('div', { class: 'v' }, value), sub ? el('div', { class: 's' }, sub) : ''); }
+function renderStatus(s) {
+  const e = s.epochs, l = e.lastSealed;
+  $('stats').replaceChildren(
+    stat('tip', s.tip.height.toLocaleString(), `${short(s.tip.hash)} · block ${ago(s.tip.ageSeconds)} old`),
+    stat('peers', String(s.peers.length), s.peers.map((p) => `${p.host.split('.')[0]} ${p.userAgent ?? ''}`).join(' · ') || 'none'),
+    stat('mempool', `${s.mempool.txs} tx`, s.sync.syncing ? 'syncing now' : `last sync ${s.sync.lastAt ? ago((Date.now() - Date.parse(s.sync.lastAt)) / 1000) + ' ago' : 'not yet'}`),
+    stat('utxo set', `${s.utxo.coins.toLocaleString()} coins`, `${s.utxo.amount.toLocaleString()} tBTC5 · hash_serialized_3 ${s.utxo.hashSerialized3}`),
+    stat('epochs', l ? `${l.epoch} sealed` : 'none sealed', `${l ? `last ${l.from}–${l.to} · ` : ''}period ends at ${e.nextPeriodEnd}, ${e.blocksToGo} to go`),
+    stat('node', s.implementation, `up ${ago(s.uptimeSeconds)}${s.store ? ` · ${s.store.blocks.toLocaleString()} blocks · ${(s.store.bytes / 1e6).toFixed(2)} MB` : ''}`),
+  );
+}
+function renderChecks() {
+  const rows = [];
+  const add = (state, text, why) => rows.push(el('li', {}, el('span', { class: `dot ${state}` }), el('span', {}, text, why ? el('span', { class: 'why' }, ' · ', why) : '')));
+  if (!status) add('bad', 'node API', `no answer from ${API}`);
+  else {
+    add('ok', 'node API answers', `${status.implementation}, tip ${status.tip.height}`);
+    const age = status.tip.ageSeconds; add(age < 3600 ? 'ok' : 'warn', 'tip is fresh', `newest block ${ago(age)} old`);
+    if (status.sync.lastError) add('warn', 'last sync error', `${status.sync.lastError.message} (${status.sync.lastError.at})`);
+    const closed = Math.floor((status.tip.height + 1) / INTERVAL) * INTERVAL - 1, sealed = status.epochs.lastSealed?.to ?? -1;
+    add(sealed >= closed ? 'ok' : 'warn', 'epoch files up to date', sealed >= closed ? `sealed through ${sealed}` : `sealed through ${sealed}, but the period ending ${closed} has closed`);
+    if (network === undefined) add('', 'at the network tip', 'asking Nostr relays…');
+    else if (!network) add('warn', 'at the network tip', 'no valid NIP-333 tip from the relays');
+    else { const d = network.tip - status.tip.height;
+      add(d <= 0 ? 'ok' : d <= 2 ? 'warn' : 'bad', 'at the network tip', `${d <= 0 ? 'yes' : d + ' block(s) behind'}: NIP-333 says ${network.tip} (published ${ago(Date.now() / 1000 - network.created_at)} ago; author, proof of work and links checked here, signature not)`); }
+  }
+  $('checks').replaceChildren(...rows);
+}
+async function refresh() {
+  try { status = await get('/status'); renderStatus(status); $('live').className = 'dot ok'; $('updated').textContent = `updated ${new Date().toLocaleTimeString()}`; }
+  catch (e) { status = null; $('live').className = 'dot bad'; $('updated').textContent = e.message;
+    $('stats').replaceChildren(el('div', { class: 'stat', style: 'grid-column:1/-1' }, el('div', { class: 'l' }, 'node'), el('div', { class: 'v' }, 'not answering'), el('div', { class: 's' }, `no answer from ${API}/status: is the node running? (node src/node.js --api 3497)`))); }
+  renderChecks();
+  if (status && status.tip.hash !== lastTip) { lastTip = status.tip.hash; recentBlocks(status.tip.height).catch((e) => $('blocks').replaceChildren(el('tr', {}, el('td', { colspan: 4, class: 'err' }, e.message)))); }
+}
+async function recentBlocks(tip) {
+  const hs = []; for (let h = tip; h > tip - RECENT && h >= 0; h--) hs.push(h);
+  const rows = await Promise.all(hs.map(async (h) => { const hash = await get(`/block-height/${h}`, 'text'); return get(`/block/${hash}`); }));
+  $('blocks').replaceChildren(...rows.map((b) => el('tr', {}, el('td', {}, link('block', b.id, String(b.height))), el('td', { class: 'h' }, link('block', b.id)), el('td', { class: 'num' }, String(b.tx_count)), el('td', {}, `${new Date(b.timestamp * 1000).toLocaleString()} (${ago(Date.now() / 1000 - b.timestamp)} ago)`))));
+}
+
+// ---- lookups: #block/<hash>, #tx/<txid>, #address/<addr>, or a search ----
+const kv = (pairs) => el('dl', { class: 'kv' }, ...pairs.flatMap(([k, v]) => [el('dt', {}, k), el('dd', {}, v)]));
+async function show(kind, id) {
+  const d = $('detail'); d.replaceChildren(el('div', { class: 'err muted' }, 'loading…'));
+  try {
+    if (kind === 'block') {
+      const b = await get(`/block/${id}`), txids = await get(`/block/${id}/txids`);
+      d.replaceChildren(el('div', { class: 'head' }, `block ${b.height}`), kv([['hash', b.id], ['previous', b.previousblockhash ? link('block', b.previousblockhash) : '—'], ['time', new Date(b.timestamp * 1000).toLocaleString()], ['bits', b.bits.toString(16)], ['nonce', String(b.nonce)], ['merkle root', b.merkle_root], ['transactions', String(b.tx_count)]]),
+        el('div', { class: 'kv' }, ...txids.flatMap((t, i) => [el('span', { class: 'muted' }, String(i)), link('tx', t)])));
+    } else if (kind === 'tx') {
+      const t = await get(`/tx/${id}`), outs = await get(`/tx/${id}/outspends`);
+      const addr = (o) => o?.scriptpubkey_address ? link('address', o.scriptpubkey_address) : el('span', { class: 'muted' }, o?.scriptpubkey_type ?? '?');
+      d.replaceChildren(el('div', { class: 'head' }, `transaction`), kv([['txid', t.txid], ['status', t.status.confirmed ? el('span', {}, 'in block ', link('block', t.status.block_hash, String(t.status.block_height))) : 'mempool'], ['size / weight', `${t.size} B / ${t.weight} WU`], ['fee', `${t.fee} sat`]]),
+        el('div', { class: 'io' },
+          el('div', {}, el('h4', {}, `inputs (${t.vin.length})`), ...t.vin.map((i) => el('p', {}, i.is_coinbase ? 'coinbase' : el('span', {}, link('tx', i.txid, short(i.txid)), `:${i.vout} · `, addr(i.prevout), i.prevout ? ` · ${btc(i.prevout.value)}` : '')))),
+          el('div', {}, el('h4', {}, `outputs (${t.vout.length})`), ...t.vout.map((o, n) => el('p', {}, `${n} · `, addr(o), ` · ${btc(o.value)}`, outs[n]?.spent ? el('span', { class: 'muted' }, ' · spent in ', link('tx', outs[n].txid, short(outs[n].txid))) : el('span', { class: 'muted' }, ' · unspent'))))));
+    } else if (kind === 'address') {
+      const a = await get(`/address/${id}`), u = await get(`/address/${id}/utxo`), c = a.chain_stats, m = a.mempool_stats;
+      d.replaceChildren(el('div', { class: 'head' }, 'address'), kv([['address', a.address], ['balance', `${btc(c.funded_txo_sum - c.spent_txo_sum)} tBTC5 confirmed${m.tx_count ? `, ${btc(m.funded_txo_sum - m.spent_txo_sum)} in mempool` : ''}`], ['transactions', String(c.tx_count + m.tx_count)], ['unspent outputs', String(u.length)]]),
+        el('div', { class: 'kv' }, ...u.slice(0, 200).flatMap((x) => [el('span', {}, btc(x.value)), el('span', {}, link('tx', x.txid, short(x.txid)), `:${x.vout}`, x.status.confirmed ? '' : ' (mempool)')])));
+    }
+  } catch (e) { d.replaceChildren(el('div', { class: 'err' }, `${kind} ${id}: ${e.message}`)); }
+}
+async function search(q) {
+  q = q.trim(); if (!q) return;
+  if (/^\d+$/.test(q)) { try { location.hash = `block/${await get(`/block-height/${q}`, 'text')}`; } catch (e) { $('detail').replaceChildren(el('div', { class: 'err' }, `no block at ${q}`)); } return; }
+  if (/^[0-9a-f]{64}$/i.test(q)) { const h = q.toLowerCase(); try { await get(`/block/${h}`); location.hash = `block/${h}`; } catch { location.hash = `tx/${h}`; } return; }
+  location.hash = `address/${q}`;
+}
+function route() { const m = location.hash.match(/^#(block|tx|address)\/(.+)$/); if (m) show(m[1], decodeURIComponent(m[2])); else $('detail').replaceChildren(); }
+$('go').onclick = () => search($('q').value);
+$('q').onkeydown = (e) => { if (e.key === 'Enter') search($('q').value); };
+addEventListener('hashchange', route);
+
+network = undefined;
+refresh(); route();
+const nostr = () => nostrTip().then((t) => { network = t; renderChecks(); }).catch(() => { network = null; renderChecks(); });
+nostr();
+setInterval(refresh, 15000);
+setInterval(nostr, 120000);
+</script>
+</body>
+</html>
