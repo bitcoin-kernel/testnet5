@@ -20,6 +20,15 @@
       "lastHash": "00000000000003cce0a1fa7cefe5faa7c5a009512c4fdda6f770a80e374c051e",
       "bytes": 1138412,
       "sha256": "ca4f418f6e13f57bed05979e29a306eaecc0c573bd334e19c555d28c1ba23811"
+    },
+    {
+      "epoch": 2,
+      "file": "epoch-2.bin",
+      "from": 4032,
+      "to": 6047,
+      "lastHash": "0000000000000090acdbacc727ee18db959df3a07d758d59d491fdbbca5f1039",
+      "bytes": 1086132,
+      "sha256": "4c0f16f83dd4ffd6c59599fbd6d33b589a67130f8411a3bf96d2c548ba6bdf75"
     }
   ]
 }
